@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Precision AI Soil Analysis</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #eef3f7;
+      margin: 0; padding: 0;
+    }
+    header {
+      background: #2e7d32; color: white;
+      padding: 1.2rem; text-align: center;
+    }
+    form, #dashboard {
+      background: white;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      margin-bottom: 1rem;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 1rem;
+      display: block;
+    }
+    input, select {
+      width: 100%;
+      padding: 0.5rem;
+      margin-top: 0.4rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    .inline-inputs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+    input[type="range"] {
+      margin-top: 0.5rem;
+    }
+    span.value {
+      font-weight: normal;
+      color: #1b5e20;
+    }
+    button {
+      margin-top: 1.5rem;
+      background-color: #2e7d32;
+      color: white;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    button:hover {
+      background-color: #256428;
+    }
+    pre {
+      background: #f5f5f5;
+      padding: 1rem;
+      border-radius: 6px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🌾 Precision AI Soil Analysis Dashboard</h1>
+</header>
+
+<form id="soilForm">
+  <h2>🌱 Enter Soil Parameters</h2>
+  <div class="inline-inputs">
+    <div>
+      <label for="ph">Soil pH (0–14): <span class="value" id="phVal">7</span></label>
+      <input type="range" id="ph" min="0" max="14" step="0.1" value="7" oninput="phVal.innerText=this.value">
+    </div>
+    <div>
+      <label for="ec">Electrical Conductivity (dS/m):</label>
+      <input type="number" id="ec" step="0.01" value="0.3">
+    </div>
+    <div>
+      <label for="moisture">Moisture (%) <span class="value" id="moistureVal">25</span></label>
+      <input type="range" id="moisture" min="0" max="100" value="25" oninput="moistureVal.innerText=this.value">
+    </div>
+    <div>
+      <label for="n">Nitrogen (mg/kg):</label>
+      <input type="number" id="n" value="40">
+    </div>
+    <div>
+      <label for="p">Phosphorus (mg/kg):</label>
+      <input type="number" id="p" value="25">
+    </div>
+    <div>
+      <label for="k">Potassium (mg/kg):</label>
+      <input type="number" id="k" value="80">
+    </div>
+  </div>
+
+  <label for="cropType">Crop Type:</label>
+  <input type="text" id="cropType" placeholder="e.g., Maize, Rice, Soybean" required>
+
+  <label for="growthStage">Crop Growth Stage:</label>
+  <select id="growthStage" required>
+    <option value="">Select stage</option>
+    <option>Germination</option>
+    <option>Vegetative</option>
+    <option>Flowering</option>
+    <option>Fruiting</option>
+    <option>Harvest</option>
+  </select>
+
+  <button type="submit">🔍 Analyze with AI</button>
+</form>
+
+<div id="dashboard" style="display:none;">
+  <h2>🧠 AI-Generated Soil & Crop Report</h2>
+  <div id="analysisOutput"></div>
+  <button onclick="generatePDF()">📄 Download PDF Report</button>
+</div>
+
+<!-- Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+const GOOGLE_API_KEY = "AIzaSyCYiuBP0HMgTwZX0OsCd8L3hL_9U9HG_u4"; // Gemini API
+const WEATHER_API_KEY = "b3df74439236150a3119e1f968ae1e71"; // OpenWeatherMap API
+
+document.getElementById("soilForm").addEventListener("submit", async function (e) {
+  e.preventDefault();
+
+  const ph = document.getElementById("ph").value;
+  const ec = document.getElementById("ec").value;
+  const moisture = document.getElementById("moisture").value;
+  const n = document.getElementById("n").value;
+  const p = document.getElementById("p").value;
+  const k = document.getElementById("k").value;
+  const cropType = document.getElementById("cropType").value;
+  const growthStage = document.getElementById("growthStage").value;
+
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+
+    // Get weather data
+    const weatherRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`);
+    const weatherData = await weatherRes.json();
+    const weather = `Temperature: ${weatherData.main.temp}°C, Humidity: ${weatherData.main.humidity}%, Condition: ${weatherData.weather[0].description}`;
+
+    const prompt = `
+You are an expert in precision agriculture. Provide a detailed analysis based on:
+
+Soil Parameters:
+- pH: ${ph}
+- Electrical Conductivity: ${ec} dS/m
+- Moisture: ${moisture}%
+- Nitrogen: ${n} mg/kg
+- Phosphorus: ${p} mg/kg
+- Potassium: ${k} mg/kg
+
+Crop: ${cropType}
+Growth Stage: ${growthStage}
+Weather: ${weather}
+
+Include:
+1. Soil health status
+2. Fertilizer and irrigation recommendations
+3. Crop compatibility
+4. Suggestions for improving yield
+    `;
+
+    const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta3/models/text-bison-001:generateText?key=${GOOGLE_API_KEY}`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        prompt: { text: prompt },
+        temperature: 0.7,
+        maxOutputTokens: 1024
+      })
+    });
+
+    const aiData = await aiRes.json();
+    const result = aiData?.candidates?.[0]?.output || "AI analysis failed.";
+
+    document.getElementById("analysisOutput").innerHTML = `<pre>${result}</pre>`;
+    document.getElementById("dashboard").style.display = "block";
+  });
+});
+
+function generatePDF() {
+  const element = document.getElementById("dashboard");
+  html2pdf().from(element).save("Soil_Analysis_Report.pdf");
+}
+</script>
+
+</body>
+</html>
